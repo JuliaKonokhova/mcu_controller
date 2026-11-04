@@ -1,0 +1,22 @@
+# --- LIBRARIES ---
+
+c96.MCL K1874VE7T_av3.MCL
+
+# --- ADDRESS LENGTH ---
+
+-A(code)CODE(2000H-9FFFH)         # ROM
+-A(data)DATA(100H-07FFH)          # internal RAM
+
+# --- STACK SIZE ---
+
+-Z CSTACK(200h)
+
+# --- OTHERS OPTIONS ---
+
+-F I                              # output file:      M – debug (MCE)
+                                  #                   I - Intel HEX
+
+-E main                           # output name
+
+# --- EXPORT ---
+-E bin/cmc96/main 
