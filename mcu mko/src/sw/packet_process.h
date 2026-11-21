@@ -86,5 +86,6 @@ void handle_dpu();
 void handle_config_packet(unsigned char subaddr);
 void handle_VD_option_2();
 void handle_mko_packet(unsigned char subaddr);
+void update_scc(unsigned char new_code);
 
 #endif
