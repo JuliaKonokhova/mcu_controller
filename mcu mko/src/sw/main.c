@@ -3,13 +3,19 @@
 
 #include "uart.h"
 #include "packet_process.h"
+#include "spacewire.h"
+#include "common.h"
+#include "RMAP_ctrl.h"
+
 #pragma CCB 0x2E // 0x2E
 
 #pragma interrupt 0 IRQ_timer
+#pragma interrupt 8 IRQ_uart_rx_tx
 #pragma interrupt 9 IRQ_bsi
 
 void IRQ_bsi(void);
 void IRQ_timer(void);
+void build_mko_status(void);
 
 // переменные для работы с таймером
 volatile unsigned char timer_signal;
@@ -23,7 +29,7 @@ unsigned char trm_buf[TRM_BUF_SIZE];
 unsigned char tmp;
 
 volatile unsigned short bsi_int_addr = 0x8202;
-volatile unsigned short ct_mko = 0;
+unsigned short ct_mko = 0;
 
 // инициализация таймера
 void init_timer(void) {
@@ -76,8 +82,8 @@ void trm_send_byte(char c) {
 void timer_irq_handler(unsigned short counter) {
 	volatile unsigned char i;
 	if (timer_count == counter) {
-		timer_count = 0;
 		build_mko_status();
+		timer_count = 0;
 		write_data_to_addr(0xFFFF, SEMAPHORE_ADDRESS);
 		for (i = 0; i < 8; i++)
 			AD_to_BSI(i);
@@ -87,7 +93,7 @@ void timer_irq_handler(unsigned short counter) {
 	}
 }
 
-void build_mko_status() {
+void build_mko_status(void) {
 	unsigned short status, datacnt, sa;
 
 	status = BSISTAT_TERM;
@@ -107,20 +113,18 @@ void build_mko_status() {
 	ct_mko |= (datacnt << 8);
 
 	ct_mko |= (1 << 13) | (1 << 14) | (1 << 15); // reserv
-
-	sprintf(trm_buf, "CT_MKO = %02Xh\n\n", ct_mko); // debug
-	trm_send(trm_buf);								// debug
-	*(volatile unsigned short*)(CT_MKO_ADDRESS) = ct_mko;
+	
+	store_at_address(0x1240, 14, 1, &ct_mko);
 }
 
 void bsi_rt_irq_handler(unsigned short status) {
-	unsigned short subaddr;
+	unsigned char subaddr;
 
 	bsi_int = 0;
 	subaddr = (status >> 5) & 0x1F;
-	
-	build_mko_status();
 
+	build_mko_status();
+		
 	if (!(status & BSISTAT_TERM_T_R_Msk))
 		handle_mko_packet(subaddr - 1);
 
@@ -130,13 +134,15 @@ void bsi_rt_irq_handler(unsigned short status) {
 void main() {
 	
 	unsigned char bsi_rt_addr;
-	
+	extern uint16_t spwstat_log;
+
 	if (IOPORT2_Bits.PIN2 == 0)
 		bsi_rt_addr = IOPORT2_Bits.PIN7 | (IOPORT2_Bits.PIN6 << 1) | (IOPORT1_Bits.PIN6 << 2) | (IOPORT2_Bits.PIN4 << 3) | (IOPORT2_Bits.PIN3 << 4);
 	else
 		bsi_rt_addr = BSI_RT_ADDR;
 	
 	// Запуск таймера
+
 	init_timer();
 	tmp = WSR;
 	WSR = 0x0F;             //swap to HWindow15
@@ -145,19 +151,24 @@ void main() {
 	WSR = tmp;
 	_ei_();
 
-	update_scc(0xFF);
-
 	while (timer_count < 560); // 2.8 с. Счетчик по 5 мс // корректное значение 2800 / 5, т.е. 560
 	timer_count = 0;
 	bsi_int = 0;
 
 	_ei_();
-	
+	trm_init(); 
+	SpW_Init();
 	bsi_data_init();
 	init_bsi_terminal(bsi_rt_addr);
+	update_scc(0xFF);
 	_ei_();
 
 	while(1) {
+		 if (spwstat_log & (SWSTAT_EOPREC_Msk | SWSTAT_EEPREC_Msk)) {
+		 	SpW_RMAP_target();
+        	SWSTAT |= (SWSTAT_EEPREC_Msk | SWSTAT_EOPREC_Msk | SWSTAT_DATAREC_Msk | SWSTAT_RBUFFULL_Msk);
+        }
+
 		if (bsi_int) {
 			bsi_int = 0;
 			bsi_rt_irq_handler(bsi_rt_stat);

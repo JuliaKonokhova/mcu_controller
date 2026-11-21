@@ -1,4 +1,5 @@
 #include "bsi_rt.h"
+#include "uart.h" // debug
 
 // Запись двух байт данных из адреса по другому адресу
 void write_addr_to_addr(unsigned short addr_from, unsigned short addr_to) {
@@ -195,40 +196,15 @@ void BSI_to_AD(unsigned char saddr, unsigned char count) {
 	
 	volatile unsigned char i;
 	volatile unsigned short bsi_addr, ad_addr;
+	unsigned char data[32];
 	
 	bsi_addr = RT_RECEIVE_BASE + RT_SUBADDR_SIZE * saddr + 4;
 	ad_addr = AD_BASE_R + (RT_SUBADDR_SIZE - 4) * saddr;
-	
-	for (i = 0; i < count; i++)
+
+	for (i = 0; i < count; i++) {
 		*(volatile unsigned short*)(ad_addr + i * 2) = *(volatile unsigned short*)(bsi_addr + i * 2); 
+		data[i] = ((*(volatile unsigned short*)(bsi_addr + i * 2)) & 0xFF);
+		trm_send_byte(data[i]);
+	}
 }
 
-// cd 2. 844 + 0 * 2 = 844 
-// cd 3. 844 + 1 * 2 = 846
-// cd 4. 844 + 2 * 2 = 848
-// cd 5. 844 + 3 * 2 =  84A
-// cd 6. 844 + 4 * 2 = 84C
-// cd 7. 844 + 5 * 2 = 84E
-// cd 8. 844 + 6 * 2 = 850
-// cd 9. 844 + 7 * 2 = 852
-// cd 10. 844 + 8 * 2 = 854
-// cd 11. 844 + 9 * 2 = 856
-// cd 12. 844 + 10 * 2 = 858
-// cd 13. 844 + 11 * 2 = 85A
-// cd 14. 844 + 12 * 2 = 85C
-// cd 15. 844 + 13 * 2 = 85E
-// cd 16. 844 + 14 * 2 = 860
-// cd 17. 844 + 15 * 2 = 862
-// cd 18. 844 + 16 * 2 = 864
-// cd 19. 844 + 17 * 2 = 866
-// cd 20. 844 + 18 * 2 = 868
-// cd 21. 844 + 19 * 2 = 86A
-// cd 22. 844 + 20 * 2 = 86C
-// cd 23. 844 + 21 * 2 = 86E
-// cd 24. 844 + 22 * 2 = 870
-// cd 25. 844 + 23 * 2 = 872
-// cd 26. 844 + 24 * 2 = 874
-// cd 27. 844 + 25 * 2 = 876
-// cd 28. 844 + 26 * 2 = 878
-// cd 30. 844 + 27 * 2 = 87A
-// cd 31. 844 + 28 * 2 = 87C

@@ -1,5 +1,5 @@
 #include "packet_process.h"
-
+#include "uart.h"
 // переменные для обработки ДПУ
 /*volatile unsigned char dpu_valid = 0;
 volatile unsigned char dpu_protect = 0;
@@ -77,8 +77,10 @@ CommandDPU dpu[DPUSize] = {
 
 ///////////////////////////// ОБРАБОТКА ПРИНЯТЫХ ДАННЫХ /////////////////////////////
 
-void update_scc(unsigned short new_code) {	
-	scc_count++;
+void update_scc(unsigned char new_code) {	
+
+	if (new_code != 0xFF)
+		scc_count++;
 
 	*(volatile unsigned short*)(0x8406) = new_code << 8;
 	*(volatile unsigned short*)(0x8408) = (scc_old[1] << 8) | scc_old[0];
@@ -159,10 +161,11 @@ void handle_config_packet(unsigned char subaddr) {
 	}
 	
 	temp = *(volatile unsigned short*)(address); // 32 СД по начальному адресу
+
 	calculated_crc = calculate_crc8(data, 31 * 2);
 	received_crc = (unsigned char)(temp & 0x00FF);
-
-	if (calculated_crc == received_crc && check_identifier_address(address) == 1)
+	
+	if (calculated_crc == received_crc && check_identifier_address(address) == 1) 
 		BSI_to_AD(subaddr, 30); // СД2 - СД31 (СД1 и СД 32 пропускается внутри функции)
 	else
 		write_data_to_addr(0x0001, ERROR_CONFIG_ADDRESS); // не следует ли прибавить значение?
